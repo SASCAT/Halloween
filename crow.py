@@ -7,16 +7,16 @@ from gpiozero import LED
 from rpi_hardware_pwm import HardwarePWM
 
 # ---------------- Settings ----------------
-LED_PIN = 17
+LED_PIN = 13 # From 17 due to seeed only exposing GPIO12, 13 - Grove port signal 2 
 SOUND_DIR = Path(__file__).parent / "sounds"
 NUM_SOUNDS = 14
 
 BEAK_CLOSED_ANGLE = 0       # adjust to suit your linkage
-BEAK_OPEN_ANGLE = 20        # degrees opened while squawking
+BEAK_OPEN_ANGLE = 15        # degrees opened while squawking
 
-BLINK_MIN, BLINK_MAX = 5, 10        # seconds between blinks
-BLINK_DURATION = 0.15               # seconds eye is off
-SQUAWK_MIN, SQUAWK_MAX = 10, 20     # seconds between squawks
+BLINK_MIN, BLINK_MAX = 4, 8         # seconds between blinks
+BLINK_DURATION = 0.20               # seconds eye is off
+SQUAWK_MIN, SQUAWK_MAX = 12, 24      # seconds between squawks
 
 # ---------------- Hardware ----------------
 led = LED(LED_PIN)
@@ -53,9 +53,11 @@ def main():
         # ---- LED blink ----
         if blink_end is None:
             if now >= next_blink:
+                print("Blink off")
                 led.off()
                 blink_end = now + BLINK_DURATION
         elif now >= blink_end:
+            print("Blink on")
             led.on()
             blink_end = None
             next_blink = random_delay(BLINK_MIN, BLINK_MAX)
@@ -67,7 +69,7 @@ def main():
                 while n == last_sound:
                     n = random.randint(1, NUM_SOUNDS)
                 last_sound = n
-
+                print("Sqwark")
                 path = SOUND_DIR / f"{n:04d}.mp3"
                 player = subprocess.Popen(
                     ["mpg123", "-q", str(path)],
@@ -75,6 +77,7 @@ def main():
                 set_angle(BEAK_CLOSED_ANGLE + BEAK_OPEN_ANGLE)
         elif player.poll() is not None:         # mp3 has finished
             player = None
+            print("Close Beak")
             set_angle(BEAK_CLOSED_ANGLE)
             next_squawk = random_delay(SQUAWK_MIN, SQUAWK_MAX)
 

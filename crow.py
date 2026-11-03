@@ -3,7 +3,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from gpiozero import LED
+from gpiozero import PWMLED
 from rpi_hardware_pwm import HardwarePWM
 
 # ---------------- Settings ----------------
@@ -19,8 +19,9 @@ BLINK_DURATION = 0.20               # seconds eye is off
 SQUAWK_MIN, SQUAWK_MAX = 12, 24      # seconds between squawks
 
 # ---------------- Hardware ----------------
-led = LED(LED_PIN)
+led = PWMLED(LED_PIN)
 servo = HardwarePWM(pwm_channel=0, hz=50, chip=0)   # GPIO12
+EYE_BRIGHTNESS = 0.01 # 0 = off, 1.0 = Max
 
 
 def angle_to_duty(angle):
@@ -39,7 +40,7 @@ def random_delay(lo, hi):
 # ---------------- Main ----------------
 def main():
     servo.start(angle_to_duty(BEAK_CLOSED_ANGLE))
-    led.on()
+    led.value = EYE_BRIGHTNESS
 
     next_blink = random_delay(BLINK_MIN, BLINK_MAX)
     blink_end = None
@@ -58,7 +59,7 @@ def main():
                 blink_end = now + BLINK_DURATION
         elif now >= blink_end:
             print("Blink on")
-            led.on()
+            led.value = EYE_BRIGHTNESS
             blink_end = None
             next_blink = random_delay(BLINK_MIN, BLINK_MAX)
 

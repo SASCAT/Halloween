@@ -37,6 +37,7 @@ def set_angle(angle):
 
 # ---------------- DFPlayer Mini ----------------
 def df_send(cmd, param=0):
+    print("DF Send")
     data = bytearray([0xFF, 0x06, cmd, 0x00, (param >> 8) & 0xFF, param & 0xFF])
     checksum = -sum(data) & 0xFFFF
     packet = bytearray([0x7E]) + data + bytearray(
@@ -45,6 +46,7 @@ def df_send(cmd, param=0):
 
 
 def df_init():
+    print("DF Init")
     time.sleep_ms(1000)         # let the module boot
     df_send(0x09, 2)            # select SD card
     time.sleep_ms(300)
@@ -53,10 +55,12 @@ def df_init():
 
 
 def df_play_mp3_folder(n):
+    print("DF Play")
     df_send(0x12, n)            # plays /MP3/000n.mp3
 
 
 def df_stop():
+    print("DF Stop")
     df_send(0x16)
 
 
@@ -71,6 +75,7 @@ def due(t):
 
 # ---------------- Main ----------------
 def main():
+    print("Start")
     time.sleep(3)               # window to press Stop in Thonny at startup
 
     set_angle(BEAK_CLOSED_ANGLE)

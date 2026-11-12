@@ -22,10 +22,10 @@ BUSY_START_TIMEOUT_MS = 1500   # max wait for the player to start
 
 # Head movement
 HEAD_PINS = (10, 11, 12, 13)     # IN1..IN4
-HEAD_MAX_DEG = 20                # +/- degrees from centre
-HEAD_MIN_MOVE_DEG = 6            # skip tiny movements
-HEAD_MIN_MS = 6000               # random delay between head moves
-HEAD_MAX_MS = 15000
+HEAD_MAX_DEG = 40                # +/- degrees from centre
+HEAD_MIN_MOVE_DEG = 4            # skip tiny movements
+HEAD_MIN_MS = 4000               # random delay between head moves
+HEAD_MAX_MS = 10000
 STEP_INTERVAL_US = 3000          # time per half-step (raise if it stalls)
 HOLD_COILS = False               # False = power off coils when stopped (cooler, quieter)
 
@@ -69,6 +69,7 @@ def head_release():
 
 
 def head_new_target():
+    print("Head New Target")
     """Pick a random angle within +/- HEAD_MAX_DEG, at least a minimum move away."""
     global head_target
     while True:
@@ -98,6 +99,7 @@ def head_service():
 
 
 def head_centre():
+    print("Head Centre")
     """Blocking return to centre (used when stopping)."""
     global head_target
     head_target = 0

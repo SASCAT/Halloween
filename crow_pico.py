@@ -18,7 +18,8 @@ BLINK_DURATION_MS = 150
 
 SQUAWK_MIN_MS = 10000
 SQUAWK_MAX_MS = 20000
-BUSY_START_TIMEOUT_MS = 1500   # max wait for the player to start
+BUSY_START_TIMEOUT_MS = 4000   # max wait for the player to start
+BUSY_END_DEBOUNCE_MS = 400
 
 # ---------------- Hardware ----------------
 led = Pin(LED_PIN, Pin.OUT)
@@ -118,8 +119,10 @@ def main():
         elif state == "STARTING":
             # wait for BUSY to go low (playback begun)
             if busy.value() == 0:
+                print("BUSY low -> Playing")
                 state = "PLAYING"
             elif due(start_deadline):
+                print("START Timeout")
                 # never started (missing file / SD problem): close beak, retry later
                 set_angle(BEAK_CLOSED_ANGLE)
                 next_squawk = next_time(SQUAWK_MIN_MS, SQUAWK_MAX_MS)
@@ -127,6 +130,7 @@ def main():
 
         elif state == "PLAYING":
             if busy.value() == 1:       # finished
+                print("Finished")
                 set_angle(BEAK_CLOSED_ANGLE)
                 next_squawk = next_time(SQUAWK_MIN_MS, SQUAWK_MAX_MS)
                 state = "IDLE"

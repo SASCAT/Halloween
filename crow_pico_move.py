@@ -20,6 +20,19 @@ SQUAWK_MIN_MS = 10000
 SQUAWK_MAX_MS = 20000
 BUSY_START_TIMEOUT_MS = 1500   # max wait for the player to start
 
+# Head movement
+HEAD_PINS = (10, 11, 12, 13)     # IN1..IN4
+HEAD_MAX_DEG = 20                # +/- degrees from centre
+HEAD_MIN_MOVE_DEG = 6            # skip tiny movements
+HEAD_MIN_MS = 6000               # random delay between head moves
+HEAD_MAX_MS = 15000
+STEP_INTERVAL_US = 3000          # time per half-step (raise if it stalls)
+HOLD_COILS = False               # False = power off coils when stopped (cooler, quieter)
+
+STEPS_PER_REV = 4096             # 28BYJ-48 in half-step mode
+HEAD_MAX_STEPS = int(STEPS_PER_REV * HEAD_MAX_DEG / 360)
+HEAD_MIN_MOVE_STEPS = int(STEPS_PER_REV * HEAD_MIN_MOVE_DEG / 360)
+
 # ---------------- Hardware ----------------
 led = Pin(LED_PIN, Pin.OUT)
 busy = Pin(BUSY_PIN, Pin.IN, Pin.PULL_UP)   # LOW while playing
@@ -28,12 +41,70 @@ uart = UART(0, baudrate=9600, tx=Pin(0), rx=Pin(1))
 servo = PWM(Pin(SERVO_PIN))
 servo.freq(50)
 
+# Head movement
+head_pins = [Pin(p, Pin.OUT, value=0) for p in HEAD_PINS]
+HALF_STEP = (
+    (1, 0, 0, 0), (1, 1, 0, 0), (0, 1, 0, 0), (0, 1, 1, 0),
+    (0, 0, 1, 0), (0, 0, 1, 1), (0, 0, 0, 1), (1, 0, 0, 1),
+)
+head_phase = 0       # position in the half-step sequence
+head_pos = 0         # current position in steps (0 = centre)
+head_target = 0      # where we are heading
+head_next_us = 0     # when the next step is due
 
 def set_angle(angle):
     """Move servo to angle (0-180). Pulse 0.5ms-2.5ms in a 20ms period."""
     pulse_us = 500 + (angle / 180) * 2000
     servo.duty_u16(int(pulse_us / 20000 * 65535))
 
+# ---------------- Head movement ----------------
+def head_write(phase):
+    for pin, v in zip(head_pins, HALF_STEP[phase]):
+        pin.value(v)
+
+
+def head_release():
+    for pin in head_pins:
+        pin.value(0)
+
+
+def head_new_target():
+    """Pick a random angle within +/- HEAD_MAX_DEG, at least a minimum move away."""
+    global head_target
+    while True:
+        t = random.randint(-HEAD_MAX_STEPS, HEAD_MAX_STEPS)
+        if abs(t - head_pos) >= HEAD_MIN_MOVE_STEPS:
+            head_target = t
+            return
+
+
+def head_service():
+    """Take one step toward the target if one is due. Call every loop."""
+    global head_pos, head_phase, head_next_us
+    if head_pos == head_target:
+        return
+    if time.ticks_diff(time.ticks_us(), head_next_us) < 0:
+        return
+    if head_target > head_pos:
+        head_phase = (head_phase + 1) % 8
+        head_pos += 1
+    else:
+        head_phase = (head_phase - 1) % 8
+        head_pos -= 1
+    head_write(head_phase)
+    head_next_us = time.ticks_add(time.ticks_us(), STEP_INTERVAL_US)
+    if head_pos == head_target and not HOLD_COILS:
+        head_release()
+
+
+def head_centre():
+    """Blocking return to centre (used when stopping)."""
+    global head_target
+    head_target = 0
+    while head_pos != 0:
+        head_service()
+        time.sleep_us(200)
+    head_release()
 
 # ---------------- DFPlayer Mini ----------------
 def df_send(cmd, param=0):
@@ -90,6 +161,8 @@ def main():
     start_deadline = 0
     last_sound = 0
 
+    next_head = next_time(HEAD_MIN_MS, HEAD_MAX_MS)
+    
     while True:
         # ---- LED blink (non-blocking) ----
         if blink_end is None:
@@ -101,6 +174,12 @@ def main():
             blink_end = None
             next_blink = next_time(BLINK_MIN_MS, BLINK_MAX_MS)
 
+        # ---- Head turn (non-blocking) ----
+        head_service()
+        if head_pos == head_target and due(next_head):
+            head_new_target()
+            next_head = next_time(HEAD_MIN_MS, HEAD_MAX_MS)
+            
         # ---- Squawk state machine ----
         if state == "IDLE":
             if due(next_squawk):
@@ -131,14 +210,16 @@ def main():
                 next_squawk = next_time(SQUAWK_MIN_MS, SQUAWK_MAX_MS)
                 state = "IDLE"
 
-        time.sleep_ms(10)
+        time.sleep_ms(1)
 
 
 try:
     main()
+
 except KeyboardInterrupt:
     df_stop()
     set_angle(BEAK_CLOSED_ANGLE)
+    head_centre()
     led.value(0)
     servo.deinit()
     print("Stopped")
